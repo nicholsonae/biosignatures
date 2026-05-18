@@ -37,11 +37,7 @@ program archean_world
           real(16)                          :: protein_cell
           real(16)                          :: cell_main
           real(16)                          :: cell_growth
-          !!real                              :: reseed = 1.0
           
-          
-          !!real, parameter                   :: death_starve = 2.5E-7       !! s^-1
-          !!real, parameter                   :: death_other  = 1E-15        !! s^-1
           real, parameter                   :: T_ideal      = 283.0 !!283  !! microbe ideal T
           real, parameter                   :: T_sens       = 0.0         !! microbe sensivity to temperature
           real, parameter                   :: ATP_CH4      = 0.6          !! moles of ATP per moles of CH4 produced
@@ -68,8 +64,7 @@ program archean_world
           real, parameter                   :: solubility_CH4 = 1.4E-3     !! solubility of CH4  mol L−1 bar−1
           real, parameter                   :: piston_vel_H2  = 1.3E-4     !! piston velocity for H2 at 25 degrees (m s-1)
           real, parameter                   :: solubility_H2  = 7.8E-4     !! solubility of H2 mol L^-1 bar^-1
-          real, parameter                   :: diffusion_H2   = 4.8E-9     !! m^2 s^-1
-          real, parameter                   :: diffusion_CO2  = 1E-9       !! for DIC m^2 s^-1
+          real, parameter                   :: diffusion_H2   = 4.3E-9     !! m^2 s^-1
 
           real, parameter                   :: CO2_burial       = 0.001    !! % of CO2 removed from atmosphere per year
           real, parameter                   :: CH4_burial       = 0.001    !! % of CH4 removed from atmosphere per year
@@ -132,7 +127,6 @@ program archean_world
           real(16)                          :: H2_ocean_to_add, CO2_ocean_to_add, CH4_ocean_to_add
           !!real                              :: t_bugs_starved, t_bugs_born
           integer                           :: seed_input
-          integer                           :: fix_reseed
           character(100)                    :: num1char, num2char, file_number
 
           CALL GET_COMMAND_ARGUMENT(1,num1char)   !first, read in the two values
@@ -143,9 +137,7 @@ program archean_world
           !!print *, seed_input
           !!READ(num2char,*)file_number
 
-
           call random_seed(put=[seed_input,seed_input,seed_input,seed_input,seed_input,seed_input,seed_input,seed_input])
-
 
           open(10, file="temperature_file2.txt", status='old', action='read')
           DO i = 1, t_array_length
@@ -154,8 +146,6 @@ program archean_world
           close(10)
 
           open(20, file="data_diffusion_"//trim(file_number)//".txt", status='replace', action='write')
-
-          !!open(30, file="data_random_"//trim(file_number)//".txt", status='replace', action='write')
 
           DO i = 1, t_array_length
              CO2_array(i) = 0.005 + 0.00095  * (i-1)
@@ -166,31 +156,9 @@ program archean_world
           ocean_surf_area = ocean_cover * 4.0 * pi * (planet_r + ocean_depth)**2
 
           cell_volume = (4/3.0) * pi * cell_radius**3
-          protein_cell = cell_volume * CH2O_mass_cell_v !! / molar_mass_CH2O
-          !! hydrogen used for cell = 2 * protein cell
-          !!cell_main = energy_to_ATP * ATP_cost_gram_hour * molar_mass_CH2O !!energy cost to  maintain a cell per hour
-          !! kJ/h     (kJ/mol_ATP) *  (mol_ATP g_CH2O^-1 h^-1) * (g_CH2O/mol_CH2O)   = kJ mol_CH2O^-1 h^-1
+          protein_cell = cell_volume * CH2O_mass_cell_v 
+ 
           cell_growth = energy_to_ATP *  cost_ATP_to_CH2O !! energy to build 1 mol of biomass
-          !!  kJ /mol_CH2O  =  (kJ mol_ATP^-1)    *   (mol_ATP/mol_CH2O)  = kJ mol_CH2O^-1
-          !!                 
-          !!energy_cost_hour = cell_main + cell_growth !! energetic requirements of biomass per hour for stable population
-
-          !! you need 2 mol of H2 for 1 mol of CH2O
-          
-          !! at any time population = species1%biomass / protein_cell
-
-
-          
-          !! cell_main = ATP_cost_gram_hour * protein_cell * molar_mass_CH2O !! per hour
-          !! cell_growth = protein_cell * cost_ATP_to_CH2O   how much ATP to build 1 cell
-          !!                 mol_CH2O         mol_ATP / mol_CH2O
-
-
-          !!ATP_made = CO2_maint * current_G / energy_to_ATP
-          !! mol_ATP = mol_CO2   *  (kJ mol_CO2^1)   / (kJ mol_ATP^-1)
-
-          
-
 
           
           species1%id           = 0
@@ -198,7 +166,6 @@ program archean_world
 
           species_list(1)       = species1
 
-          fix_reseed            = 0
           C_growth = 0.0
           total_C_eat = 0.0
 
@@ -238,7 +205,7 @@ program archean_world
           current_G =  delta_G(atmosphere%current_T, ocean%H2, ocean%CO2, &
                               ocean%CH4, solubility_H2, solubility_CO2, solubility_CH4, ocean_volume)
 
-          DO t_step = 0, 40000!!40000  !! run the simulation for 1 year then update the temperature
+          DO t_step = 0, 40000!! run the simulation for 1 year then update the temperature
 
              IF (total_C_eat .LE. 0) THEN
                 growth_eff = -1
@@ -249,7 +216,6 @@ program archean_world
              H2_uptake_total =  H2_uptake_total / (biotic_step)
              biotic_CH4_output = biotic_CH4_output / (biotic_step)
 
-             !!print *, "atmosphere%H2 just before writing ", atmosphere%H2
              write(20, *) t_step, atmosphere%current_T, species1%biomass, &
                   atmosphere%H2/moles_air, atmosphere%CO2/moles_air, &
                   atmosphere%CH4/moles_air, ocean%H2/ocean_volume, &
@@ -289,23 +255,13 @@ program archean_world
              IF ((seeded .EQ. 0) .AND. (T_ideal - 3 < atmosphere%current_T) .AND. (atmosphere%current_T < T_ideal + 3)) THEN
                 habitable = 1
              END IF
-             !!towrite_CO2 = atmosphere%CO2 / moles_air
-             !!towrite_CH4 = atmosphere%CH4 / moles_air
+
              
              IF (habitable .EQ. 1 .AND. t_step > 20000 .AND. seeded .EQ. 0) THEN !! seed if appropiate
                 species1%id           = 0
                 species1%biomass      = 1E2 * protein_cell
                 seeded                = 1
-                fix_reseed            = 100 !! try to reseed a max of 10 times
              END IF
-
-             IF (fix_reseed .GT. 0 .AND. species1%biomass .EQ. 0 .AND. t_step > 20000) THEN
-                species1%id           = 0
-                species1%biomass      = 1E2 * protein_cell
-                fix_reseed = fix_reseed - 1;
-                !!print *, "reseeded"
-             END IF
-                
              
              DO biotic_step = 1, step_length !! update biology for 1 year in hour steps
 
@@ -357,11 +313,6 @@ program archean_world
                          max_H2 =  ocean%H2
                       END IF
 
-                      !!IF (max_CO2 .GT. ocean%CO2) THEN
-                      !!   max_CO2 =  ocean%CO2
-                      !!END IF
-
-
                       !! need 2 H2 for 1 CH2O      CO2 + 2H2 -> CH2O + H2O
                       !! need 4 H2 for energy      CO2 + 4H2 -> CH4  + 2H2O
 
@@ -400,32 +351,6 @@ program archean_world
                       biotic_CH4_output     = biotic_CH4_output + CH4_made
                       H2_uptake_total       = H2_uptake_total + max_H2
 
-
-                      !! we have the hydrogen the population can uptake ....
-                      !! max potential biomass is max_H2 / 2.0
-                      !! max potential energy is 4 * max_H2 * current_G
-                      
-
-
-                      !!IF (current_G .LE. 0.0) THEN
-                      !!   ATP_made = 0
-                      !!   H2_maint = 0
-                      !!   CO2_maint = 0
-                         !!print *, "too low to eat", current_G
-                      !!ELSE
-                      !!  ATP_made = CO2_maint * current_G / energy_to_ATP
-                         !!print *, "ATP made: ", ATP_made / species1%population
-                         !!print *, "cell_main: ", cell_main
-                         !!print *, "cell_growth: ", cell_growth
-                         !!print *, "species%population: ", species1%population
-                         !!print *, "delta G: ", current_G
-                      !!END IF
-
-                      !!ocean%CO2             = ocean%CO2 - max_H2 / 4.0
-                      !!ocean%H2              = ocean%H2  - max_H2
-                      !!ocean%CH4             = ocean%CH4         !! add ch4
-
-                      
                          
                       IF (ocean%H2 < 0.0) THEN
                          !!ocean%H2 = 0
